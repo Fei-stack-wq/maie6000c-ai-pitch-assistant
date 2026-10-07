@@ -172,15 +172,15 @@ Generative AI assistance has been used to help prepare this milestone.
 
 ### Tools and purposes
 
-- ChatGPT/Codex: helped interpret the assignment, organize the team's project notes, draft and revise the architecture proposal and project plan, and explain the GitHub submission steps.
+- ChatGPT/Codex: helped interpret the assignment, organize the team's project notes, revise the architecture proposal and project plan.
 - GitHub Copilot: suggested the architecture commit message and extended description shown in the GitHub interface.
 
-### Human review record
+### Human Review Record
 
-Before the final team submission, we will record what the team actually checked, changed, or rejected:
+The AI-assisted draft was revised during preparation. A full team review is still pending.
 
-- Verified by the team: [Add the requirements and design decisions the team checked against the project brief.]
-- Changed by the team: [Add the revisions made after reviewing the AI-assisted draft.]
-- Rejected or deferred by the team: [Add any suggestions the team did not adopt, or state “None” if accurate.]
+- **Revisions made:** We simplified the wording to make the proposal more practical and easier to understand. We distinguished planned features from completed work and retained the project's focus on structured pitch feedback.
+- **Scope retained from the project brief:** The proposal excludes investment prediction, commercial viability evaluation, complete market research, investor matching, and a mobile application.
+- **Pending team verification:** Before submission, the team will check the proposal against the project brief and confirm the proposed database structure, API endpoints, failure and retry behavior, and milestone schedule. The model provider and individual task owners also remain to be confirmed.
 
-AI-assisted drafting does not establish that the proposed system has been implemented or tested. The team is responsible for understanding the submitted design and reporting actual implementation and verification results.
+The proposal describes planned work. It does not claim that the system has been implemented or tested. The team will update this record after completing its review and remains responsible for the final submission.
