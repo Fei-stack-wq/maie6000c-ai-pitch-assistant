@@ -1,104 +1,66 @@
-# MAIE 6000C Starter Template
+# AI Startup Pitch Feedback Assistant
 
-This repository is the starter template for MAIE 6000C: **Engineering AI Products: From Prototype to Production**.
+A course project for MAIE 6000C: Engineering AI Products: From Prototype to Production.
 
-It is intentionally small, but it already demonstrates the core engineering shape expected in the course:
+## Project Overview
 
-- a public-facing API service
-- a separate internal AI service
-- a worker process
-- a PostgreSQL database
-- Alembic migrations
-- Docker Compose deployment
-- unit, integration, and smoke testing support
-- structured logging
-- health checks
-- basic metrics
+We are building an AI Startup Pitch Feedback Assistant for student entrepreneurs who want to explain their business ideas more clearly.
 
-## Purpose of this repository
+A user submits a project title and a short pitch description. The system stores the submission, creates a background analysis job, and returns structured feedback for the user to review.
 
-This repository is **not** meant to be a feature-complete product.
+The feedback will include:
+- A concise summary.
+- The problem, target customer, proposed solution, and value proposition.
+- Missing or unclear information.
+- Three improvement suggestions.
 
-Its purpose is to provide a working baseline that teams will extend into their semester project while preserving the course’s engineering contract.
+The user decides which suggestions to use, change, or ignore. The original pitch is preserved.
 
-## Course engineering contract
+## Current Status
 
-Every passing team project built from this template must ultimately include:
+This repository is being developed from the course starter template.
 
-- a meaningful relational database layer
-- a service or API layer
-- a worker or async path outside the immediate request cycle
-- an AI-enabled function integrated into the workflow
-- reproducible local deployment
-- tests or credible verification
-- documentation
-- structured logs
-- health checks
-- basic observability
+The Week 04 documents describe our proposed architecture and implementation plan. The pitch-specific features are planned; their presence in the proposal does not mean they have already been implemented or tested.
 
-## Baseline workflow in the starter
+The setup instructions below are inherited from the starter. We will update them and record verification results as implementation progresses.
 
-The starter demonstrates a simple end-to-end flow:
+## Planned Workflow
 
-1. create a case through the API
-2. store that case in PostgreSQL
-3. create a background job
-4. let the worker claim and process the job
-5. call the internal AI service over HTTP
-6. persist the result
-7. retrieve updated state through the API
+1. Submit a project title and pitch description.
+2. Validate and store the pitch.
+3. Create a background analysis job.
+4. Have the worker call the internal AI service.
+5. Save the structured feedback and processing status.
+6. Let the user retrieve and review the result.
 
-This gives you a starting point for:
+If analysis fails, the system will preserve the pitch, show a failed status, and allow a retry.
 
-- persistence
-- inter-service communication
-- worker-based execution
-- deployment
-- testing
-- observability
+## Architecture
 
-## Repository structure
+We will extend the starter's four main components:
 
-Typical structure:
+| Component | Role |
+| --- | --- |
+| API service | Accept submissions and provide access to status, results, and retries. |
+| PostgreSQL | Store pitches, processing jobs, and analysis results. |
+| Worker | Process background jobs and save their outcomes. |
+| Internal AI service | Analyze pitch content and generate structured feedback. |
 
-```text
-.
-├─ .github/
-├─ alembic/
-├─ docs/
-├─ observability/
-├─ scripts/
-├─ services/
-│  └─ api/
-├─ submissions/
-│  ├─ week04/
-│  ├─ week07/
-│  └─ week13/
-├─ tests/
-├─ .env.example
-├─ compose.yaml
-├─ Makefile
-├─ pyproject.toml
-└─ README.md
-```
+We will retain Docker Compose for local deployment and Alembic for database migrations.
 
-## Core services
+## Scope
 
-### API service
+Our priority is a complete text-based submission and feedback workflow. We will use the API interface for the initial demonstration and add a simple web interface if time allows.
 
-The API service is the main entry point for requests and exposes routes for core system actions.
+The project does not include investment prediction, commercial viability evaluation, complete market research, investor matching, or a mobile application.
 
-### AI service
+## Project Documents
 
-The AI service is a separate internal service used to demonstrate service-to-service communication for an AI-enabled function.
+- [Architecture proposal](docs/architecture.md)
+- [Week 04 proposal and project plan](submissions/week04/README.md)
+- [Operations documentation](docs/operations.md)
 
-### Worker
-
-The worker processes jobs outside the immediate request cycle.
-
-### Database
-
-PostgreSQL is used as the relational persistence layer.
+The required Week 04 submission tag is `w04-proposal`. It will identify the reviewed submission version in the team repository.
 
 ## Quick start
 
