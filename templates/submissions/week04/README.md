@@ -229,3 +229,13 @@ feasibility, and final submission of this proposal.
 This document describes planned work and does not
 claim that the proposed system has already been
 implemented or tested.
+
+## 8. supporting artifacts
+
+**ERD diagram:**
+
+![alt text](assets/ERD.png)
+
+**architecture diagram:**
+
+![alt text](<assets/architecture diagram.png>)
