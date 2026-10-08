@@ -1,55 +1,83 @@
-# AI Startup Pitch Readiness Assistant
+# AI Startup Pitch Feedback Assistant
 
 ## Project Overview
 
-The AI Startup Pitch Readiness Assistant helps early-stage founders and student entrepreneurs review the clarity and completeness of a short startup pitch.
+The AI Startup Pitch Feedback Assistant helps early-stage founders and student entrepreneurs review the clarity and completeness of a short startup Pitch.
 
-A founder submits a title and pitch text. The system stores the original submission, creates a background analysis job, and uses an internal AI service to extract the problem, target customer, proposed solution, and value proposition. It also produces a concise summary, identifies missing or unclear information, and generates three improvement suggestions.
+A founder submits a title and short Pitch text. The system stores the original submission, creates a background analysis Job, and uses an internal AI service to extract the problem, target customer, solution, and value proposition. It also summarises the idea, identifies missing or unclear information, and generates three improvement suggestions.
 
-The founder remains responsible for deciding whether the feedback is relevant. The system does not assess investment potential or determine whether a business is commercially viable.
-
-## Primary Workflow
-
-1. The founder submits a title and short pitch through the API.
-2. The API validates and stores the original pitch and creates a linked analysis job.
-3. A worker claims the job and sends the stored pitch to the internal AI service.
-4. The worker validates and persists the structured analysis result.
-5. The founder retrieves the processing status and reviews the feedback through the API.
-
-If the AI request fails or returns invalid output, the worker records the failure and marks the job and pitch as failed.
-
-## Main Components
-
-- **API service**: validates submissions, creates pitch and job records, and exposes statuses and results.
-- **PostgreSQL**: stores pitches, analysis jobs, analysis results, and related metadata.
-- **Worker**: processes analysis jobs outside the submission request and coordinates AI calls and database updates.
-- **Internal AI service**: returns structured analysis and feedback for the submitted pitch.
-- **Docker Compose**: runs the API, database, worker, and AI service in a reproducible local environment.
-
-## Scope Boundary
-
-The initial system focuses on one complete submission-to-feedback workflow. It does not evaluate investment potential, determine commercial viability, perform complete market research, or provide formal legal or business advice.
+The founder reviews the feedback and decides whether it is relevant. The system does not assess investment potential or determine business viability.
 
 ## Project Documentation
 
 - [Detailed system architecture](docs/architecture.md)
 - [Week 4 proposal and project plan](submissions/week04/README.md)
 
-## Setup and Run
+## Quick start
 
-The system is designed to run locally with Docker Compose. Make sure Docker Desktop and Docker Compose are available, then start the services with:
+### 1. Copy environment file
+
+```bash
+cp .env.example .env
+```
+
+### 2. Start the stack
 
 ```bash
 docker compose up --build
 ```
 
-To stop the services:
+### 3. Optional observability profile
 
 ```bash
-docker compose down
+docker compose --profile observability up --build
 ```
 
-## Team Members
+### 4. Open the relevant endpoints
+
+- API docs: `http://localhost:8000/docs`
+- AI service docs: `http://localhost:8100/docs`
+- Prometheus: `http://localhost:9090` if the observability profile is enabled
+
+## Typical development commands
+
+### Stop the stack
+
+```bash
+docker compose down --remove-orphans
+```
+
+### Stop and remove volumes
+
+```bash
+docker compose down -v --remove-orphans
+```
+
+### Run tests
+
+```bash
+pytest -q
+```
+
+### Run smoke tests against a running stack
+
+```bash
+SMOKE_BASE_URL=http://localhost:8000 pytest tests/smoke -q
+```
+
+### Run migrations
+
+```bash
+docker compose run --rm api alembic upgrade head
+```
+
+### Seed demo data
+
+```bash
+docker compose run --rm api python scripts/seed_demo_data.py
+```
+
+## Group Members
 
 - FEI, Wenxiang
 - XIANG, Ke
