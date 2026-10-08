@@ -11,7 +11,7 @@ The founder reviews the feedback and decides whether it is relevant. The system 
 ## Project Documentation
 
 - [Detailed system architecture](docs/architecture.md)
-- [Week 4 proposal and project plan](submissions/week04/README.md)
+- [Week 4 proposal and project plan](templates/submissions/week04/README.md)
 
 ## Quick start
 
