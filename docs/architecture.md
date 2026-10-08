@@ -1,174 +1,135 @@
-# AI Startup Pitch Feedback Assistant — Architecture Proposal
+# Problem and Primary User
 
-## 1. Project Goal
+Early-stage founders and student entrepreneurs may struggle to explain their startup ideas clearly and identify missing information in a short Pitch.
+The assistant helps them review the clarity and completeness of their Pitch. It extracts the problem, target customer, solution, and value proposition, summarises the idea, and provides three improvement suggestions.
+The primary user is a founder preparing or revising a short startup Pitch. The founder remains responsible for deciding whether the feedback is relevant. The system does not assess investment potential or determine business viability.
 
-Our team is building an AI Startup Pitch Feedback Assistant for student entrepreneurs.
+# Primary Workflow
 
-Students may have a business idea but find it difficult to explain the problem, target customer, proposed solution, and value proposition clearly. Our system will accept a short pitch and return structured feedback that helps them improve their explanation before presenting it to teachers, classmates, or potential collaborators.
+1. The founder submits a title and short Pitch text through the API.
+2. The API trims whitespace and validates the input. Initially, the proposed limits are 3-200 characters for the title and 5-4,000 characters for the Pitch text.
+3. In one database transaction, the API stores the original Pitch with status queued and creates a linked analysis Job with status pending.
+4. The API returns the Pitch ID, Job ID, and initial statuses without waiting for AI analysis.
+5. The Worker claims the Job, records the claim time, increments the attempt count, and reads the stored Pitch.
+6. The Worker calls the internal AI service to extract Pitch elements, summarise the idea, identify missing information, and generate three suggestions.
+7. The Worker validates the output and stores the result. The result and successful status updates are committed together.
+8. The founder retrieves the current status and available feedback through the API and reviews the suggestions.
 
-This document describes our planned architecture. We will build on the course starter repository and update the design as implementation progresses.
+If the AI request fails or its output is invalid, the Worker records the error and marks the Job and Pitch as failed. A failed analysis does not produce a successful result record.
 
-## 2. Scope
+# Components and Architecture Flow
 
-Users will submit a project title and a short pitch description.
+### Components
 
-The system will return:
-- A short summary of the idea.
-- The problem, target customer, proposed solution, and value proposition.
-- Missing or unclear information.
-- Three improvement suggestions.
+- API service: Validates submissions, creates Pitch and Job records, and retrieves stored statuses and results.
+- PostgreSQL: Stores original inputs, processing Jobs, analysis results, and related metadata.
+- Worker: Polls pending Jobs and performs analysis outside the submission request. It coordinates AI calls, output validation, and database updates.
+- Internal AI service: Accepts Pitch content and uses a pretrained language model to produce structured feedback. The model/provider will be selected according to available access.
+- Docker Compose: Runs the API, database, Worker, and internal AI service in a reproducible local environment.
 
-Users will review the feedback and decide which suggestions to use, change, or ignore. The system will preserve the original pitch.
+### Architecture Flow
 
-We will not build investment prediction, commercial viability evaluation, complete market research, investor matching, or a mobile application. Our goal is to improve how a business idea is communicated.
+Founder → API: submit a title and Pitch text.
+API → PostgreSQL: store the Pitch and create the linked Job.
+Worker ↔ PostgreSQL: claim a pending Job and read its Pitch.
+Worker ↔ Internal AI service: request analysis and receive structured output.
+Worker → PostgreSQL: store the result and status updates, or record failure.
+Founder → API → PostgreSQL → API → Founder: retrieve the current status and feedback.
 
-## 3. Main User Workflow
+# Persistent Entities and Schema/ERD
 
-1. A student submits a project title and pitch description.
-2. The API checks the input.
-3. The system saves the pitch and creates a background analysis job.
-4. The user receives a pitch ID and can check the processing status.
-5. The worker sends the pitch to the AI service.
-6. The AI service returns structured feedback.
-7. The worker saves the result and marks the job as completed.
-8. The student retrieves and reviews the feedback.
+The proposed database contains three core tables:
 
-If the analysis fails, the system will show a failed status and allow the user to retry. The original pitch will remain available.
+### pitches
 
-Results will be saved before they are displayed to the user.
+- Table: pitches.
+- Primary key: id, a UUID string.
+- Important fields: title, pitch_text, status, created_at, and updated_at.
+- Foreign keys: None in the initial design.
+- Status/lifecycle: Created as queued; changes to completed after successful analysis or failed after processing failure. The original Pitch text remains unchanged; revised text is stored as a new submission.
 
-## 4. System Architecture
+### jobs
 
-We will retain the four main components of the course starter.
+- Table: jobs.
+- Primary key: id, an auto-incrementing integer.
+- Important fields: job_type, status, attempts, error, created_at, claimed_at, completed_at, and updated_at.
+- Foreign keys: pitch_id → pitches.id, non-null.
+- Status/lifecycle: pending → claimed → completed/failed. Claiming records the claim time and increments attempts. Completion or failure records the processing end time; failure also records an error.
 
-| Component | Responsibility |
-| --- | --- |
-| API service | Accept pitches, validate input, create records and jobs, and provide access to status and results. |
-| PostgreSQL | Store submitted pitches, processing jobs, and analysis results. |
-| Worker | Process queued jobs, call the AI service, and save results or failures. |
-| Internal AI service | Extract the main business elements and generate concise feedback. |
+### analysis_results
 
-The main processing path is:
+- Table: analysis_results.
+- Primary key: id, an auto-incrementing integer.
+- Important fields: summary, problem, target_customer, solution, value_proposition, missing_information, suggestions, model_identifier, prompt_version, and created_at.
+- Foreign keys: job_id → jobs.id, unique and non-null.
+- Status/lifecycle: Created only after successful analysis and output validation. No separate processing status is required. The result is retained without being overwritten by future analyses.
 
-Student → API → Database and queued job → Worker → AI service → Saved result → Student review
+# State Transitions
 
-The API will return after saving the submission. It will not wait for the AI analysis to finish. This allows users to check progress while the worker handles the slower task.
+The proposed state transitions are:
 
-For the initial demonstration, we can use the API interface. A simple web form can be added after the main workflow works.
+- Pitch: queued → completed or queued → failed.
+- Job: pending → claimed → completed/failed.
 
-## 5. Data and Persistence Plan
+The API creates the initial states. The Worker changes a pending Job to claimed, records claimed_at, and increments attempts. Claiming a Job does not change the Pitch status; the Pitch remains queued until analysis finishes.
+On success, the Worker stores the result and updates the Job and Pitch to completed in one transaction. On failure, it records the Job error and marks both records as failed. The Job's completed_at records when processing ends, whether successfully or unsuccessfully.
 
-We plan to use three related tables.
+# API/Service Boundaries
 
-| Table | Main information stored | Purpose |
-| --- | --- | --- |
-| pitches | Pitch ID, title, original description, submission time | Keep the original user input. |
-| jobs | Job ID, pitch ID, status, start and finish times, error information | Track each analysis attempt. |
-| analysis_results | Result ID, job ID, summary, extracted business elements, missing information, three suggestions, creation time | Keep the feedback returned by the AI. |
+- POST /pitches: Validates input, stores the Pitch, and creates an analysis Job. Returns 201 with Pitch ID, Job ID, and initial statuses.
+- GET /pitches/{pitch_id}: Returns the stored Pitch, current status, and available feedback. The result is absent while processing is pending or after failure.
+- GET /jobs/{job_id}: Returns Job status, attempts, processing timestamps, and a safe error message if processing failed.
+- Internal POST /analyse-pitch: Receives Pitch content from the Worker and returns structured analysis for validation.
+- /health/live and /health/ready: Retain service liveness and readiness checks.
+  Invalid input receives a validation error. Unknown Pitch or Job IDs return 404.
 
-Relationships:
-- Each job belongs to one pitch.
-- A pitch can have more than one job if an analysis is retried.
-- Each completed job has one analysis result.
-- A failed job has no successful result.
+# Worker and AI-Enabled Processing Plan
 
-We will use foreign keys to maintain these relationships. The pitch and its first job will be created in the same transaction so that an accepted submission is not left without a processing job.
+### Worker Plan
 
-The job record will be the source of processing status. The API will report the status of the latest job for a pitch.
+- Finds the oldest pending Job.
+- Marks it as claimed and records the processing attempt.
+- Reads the linked Pitch from PostgreSQL.
+- Calls the internal AI service with a configured timeout.
+- Validates the returned structure and required fields.
+- Stores the result and successful status changes in one transaction, or records processing failure.
 
-Retries will create new job records rather than overwrite previous attempts. This allows us to trace a result back to the original pitch and understand what happened when an analysis failed.
+### AI Input and Output
 
-## 6. API and Service Boundaries
+The AI receives the stored title and Pitch text. Its output includes:
 
-The following endpoints are proposed for our project. They will replace or extend the starter's generic case workflow.
-
-| Endpoint | Purpose |
-| --- | --- |
-| POST /pitches | Accept a title and description, save the pitch, and return the pitch ID and job ID. |
-| GET /pitches/{pitch_id} | Return the original pitch, latest processing status, and feedback when available. |
-| GET /jobs/{job_id} | Return the status of a specific analysis attempt. |
-| POST /pitches/{pitch_id}/retry | Create a new analysis job after a failed attempt. |
-
-The API will reject empty titles or descriptions. It will return a clear error when a requested record does not exist or a retry is requested while a job is still active.
-
-The worker will call an internal analysis endpoint on the AI service. It will send the title and pitch description and receive structured feedback.
-
-The AI service will not be called directly by users and will not write to the database. The worker will check and save its output.
-
-## 7. Background Jobs and Failure Handling
-
-We will use four job states:
-
-- queued: waiting for the worker.
-- processing: being analyzed.
-- completed: the result has been saved.
-- failed: the analysis could not be completed.
-
-We will start with one worker and use the database to track pending work. This keeps the design close to the starter and avoids adding a separate queue service at this stage.
-
-The worker will claim each job before processing it to avoid duplicate execution. It will apply a timeout when calling the AI service and check that the response contains the required fields.
-
-If the AI service is unavailable, times out, or returns an invalid response, the worker will record the failure. The user can then retry without resubmitting the original pitch.
-
-For the initial version, retries will be triggered by the user. We will also check for jobs left in processing after a worker interruption so that they do not remain stuck indefinitely.
-
-## 8. AI Output and Human Review
-
-The AI will analyze the submitted text and return a consistent structure containing:
-- Summary.
+- A short idea summary.
 - Problem.
 - Target customer.
-- Proposed solution.
+- Solution.
 - Value proposition.
 - Missing or unclear information.
-- Three improvement suggestions.
+- Exactly three improvement suggestions.
 
-If the pitch does not explain an element, the AI should identify it as missing rather than invent information.
+# Failure, Retry, and Review Behavior
 
-The worker will validate the response structure before saving it. We will also review sample outputs manually to check whether the feedback is relevant and grounded in the pitch. Correct formatting alone does not prove that the feedback is useful.
+### Failure Handling
 
-Users remain responsible for deciding whether to follow the suggestions. They can revise their pitch outside the system; a separate suggestion-editing feature is not required for the initial demonstration.
+AI timeouts, service errors, and invalid outputs are treated as processing failures. The Worker stores an error on the Job and marks the Job and Pitch as failed.
+The API returns a clear failure status without exposing credentials or internal stack traces. The system does not substitute invented feedback for failed analysis.
+If a database failure prevents status updates, the Worker logs the event for investigation. If the Worker stops after claiming a Job, that Job may remain claimed; automatic recovery is outside the initial scope.
 
-The model and provider have not yet been selected. We will confirm access, cost, and output quality before the Week 7 demonstration. Mock responses may be used to test the workflow, but they will be labeled and will not count as a working AI demonstration.
+### Retry Policy
 
-## 9. Quality Priorities and Verification
+The initial version does not automatically retry failed Jobs. A user may submit the Pitch again as a new submission.
+If controlled retry or repeated analysis is added later, it will create a new Job while preserving previous Jobs and results. The interface and status-selection rules will be defined before enabling that feature.
 
-Our main quality priorities are reliability, response time, and traceability.
+### Human Review and Data Handling
 
-| Priority | Our approach | How we will check it |
-| --- | --- | --- |
-| Reliability | Save job status, record failures, and allow retries. | Test a successful analysis, an AI failure, and a retry. |
-| Response time | Run analysis in the worker rather than inside the submission request. | Confirm that users receive an ID before analysis finishes and can check progress. |
-| Traceability | Keep original pitches, job records, and saved results. | Retrieve a result and identify the input and job that produced it. |
+The founder reviews feedback before acting on it and may ignore or revise suggestions. A formal approval system and stored review records are outside the initial scope.
 
-We will also check that:
-- Empty input is rejected.
-- Each accepted pitch has a linked job.
-- Results contain the required fields and three suggestions.
-- Missing information is flagged.
-- Saved pitches and results remain available after services restart.
-- Failed analyses are not shown as completed.
+# Risks and Scope Cuts
 
-These are planned checks. We will record actual results as the system is implemented.
+- AI output quality: Output may be invalid or unsupported by the Pitch. We will validate its structure, explicitly flag missing information, and review representative outputs.
+- External service reliability: AI access, latency, or availability may prevent analysis. We will confirm access early, configure timeouts, and expose recorded failures.
+- Integration consistency: API, schema, Worker, and AI output contracts may become inconsistent. We will agree on shared contracts and verify changes through integration checks.
+- Worker interruption: A claimed Job may remain unfinished after the Worker stops. We will document manual investigation and defer automatic recovery.
+- Project scope: Optional features may delay the core workflow. We will prioritise one complete submission-to-feedback workflow.
 
-## 10. Deployment and Operations
-
-We will use the starter's Docker Compose setup to run the API, worker, AI service, and PostgreSQL locally. Database changes will be managed through Alembic migrations.
-
-We will retain health checks and structured logs. Logs will include job IDs, state changes, and error categories so that we can investigate failures. We will monitor analysis duration and the number of completed and failed jobs.
-
-Testing and demonstrations will use public, synthetic, anonymized, or instructor-approved inputs. Credentials will remain outside the repository, and application logs will avoid recording full pitch text.
-
-## 11. Week 7 Demonstration
-
-Our minimum Week 7 demonstration will show one complete workflow:
-
-1. Submit a project title and short pitch.
-2. Save the pitch and create a background job.
-3. Process the pitch through the worker and AI service.
-4. Retrieve structured feedback and three improvement suggestions.
-5. Show processing status and demonstrate how a failed analysis can be retried.
-
-We will prioritize this workflow before improving the interface. If time is limited, we will demonstrate it through the API.
-
-The main risks are unavailable model access, inconsistent AI output, and spending too much time on extra features. We will address these by confirming model access early, testing with a small set of sample pitches, and keeping the agreed scope.
+The first scope cuts are dashboards, repeated-analysis interfaces, result comparisons, automatic retries, and stored review records.
+The protected core is submission, relational persistence, background AI analysis, output validation, failure visibility, and result retrieval.
